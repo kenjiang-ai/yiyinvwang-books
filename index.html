@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link rel="apple-touch-icon" href="share.jpg">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="assets/app.css?v=5">
+<link rel="stylesheet" href="assets/app.css?v=6">
 </head>
 <body>
 <div id="app" class="app">
@@ -91,15 +91,24 @@
   <div class="reader-body">
     <iframe id="readerFrame" class="reader-frame" title="绘本阅读" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"></iframe>
     <div id="readerLoading" class="reader-loading" hidden>
-      <span class="rl-spinner" aria-hidden="true"></span>
-      <p class="rl-title">绘本加载中…</p>
-      <p class="rl-sub">插图较多，第一次打开会稍慢一点</p>
+      <div class="rl-rocket" aria-hidden="true">
+        <span class="rl-star rl-s1"></span>
+        <span class="rl-star rl-s2"></span>
+        <span class="rl-star rl-s3"></span>
+        <svg viewBox="0 0 48 48" width="64" height="64"><path d="M24 4c7 6 10 14 10 22l-10 14L14 26c0-8 3-16 10-22z" fill="#C9714D"/><circle cx="24" cy="20" r="4.2" fill="#fff"/><path d="M15 30l-6 5 8-1zM33 30l6 5-8-1z" fill="#7E9678"/><path d="M21 40l3 6 3-6z" fill="#E0A55F"/></svg>
+      </div>
+      <p class="rl-title">绘本正在飞来…</p>
+      <div class="rl-progress"><div id="rlBarFill" class="rl-bar-fill"></div></div>
+      <p id="rlPct" class="rl-pct"></p>
+      <p id="rlTeaser" class="rl-teaser"></p>
+      <button id="rlRetry" class="rl-retry" type="button" hidden>网络有点慢，点我重试</button>
+      <a id="rlOpen" class="rl-open" href="#" target="_blank" rel="noopener" hidden>或在新页面打开</a>
     </div>
   </div>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="assets/app.js?v=6"></script>
+<script src="assets/app.js?v=7"></script>
 </body>
 </html>

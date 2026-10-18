@@ -398,14 +398,26 @@ body.locked{overflow:hidden;}
   background:var(--paper);color:var(--ink-soft);
 }
 .reader-loading[hidden]{display:none;}
-.rl-spinner{
-  width:38px;height:38px;border-radius:50%;
-  border:3px solid var(--line);border-top-color:var(--accent);
-  animation:rlspin .8s linear infinite;
-}
-@keyframes rlspin{to{transform:rotate(360deg);}}
-.rl-title{font-family:var(--serif);font-size:17px;margin:0;color:var(--ink);}
-.rl-sub{font-size:12.5px;color:var(--ink-mute);margin:0;}
+.rl-rocket{position:relative;width:72px;height:72px;display:flex;align-items:center;justify-content:center;
+  animation:rlfloat 1.8s ease-in-out infinite;}
+@keyframes rlfloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-9px);}}
+.rl-star{position:absolute;width:5px;height:5px;border-radius:50%;background:var(--accent);opacity:0;animation:rlstar 1.6s linear infinite;}
+.rl-s1{left:2px;top:18px;animation-delay:0s;}
+.rl-s2{right:4px;top:34px;animation-delay:.5s;background:var(--sage);}
+.rl-s3{left:6px;top:48px;animation-delay:1s;background:var(--gold);}
+@keyframes rlstar{0%{opacity:0;transform:translateY(6px) scale(.6);}40%{opacity:1;}100%{opacity:0;transform:translateY(-14px) scale(1);}}
+.rl-title{font-family:var(--serif);font-size:18px;margin:6px 0 2px;color:var(--ink);}
+.rl-progress{width:78%;max-width:300px;height:10px;border-radius:999px;background:var(--line);overflow:hidden;}
+.rl-bar-fill{height:100%;width:4%;border-radius:999px;background:linear-gradient(90deg,var(--accent),#E08A5F);transition:width .25s ease;}
+.rl-bar-fill.indeterminate{width:40%;animation:rlslide 1.1s ease-in-out infinite;}
+@keyframes rlslide{0%{margin-left:-42%;}100%{margin-left:102%;}}
+.rl-pct{font-size:13px;font-weight:700;color:var(--accent);margin:0 0 4px;min-height:16px;}
+.rl-teaser{font-size:13px;line-height:1.7;color:var(--ink-mute);margin:0;max-width:300px;min-height:40px;}
+.rl-retry{margin-top:8px;padding:9px 20px;border-radius:999px;border:1px solid var(--accent);
+  background:var(--accent);color:#fff;font-size:14px;font-weight:700;}
+.rl-retry[hidden]{display:none;}
+.rl-open{display:block;margin-top:10px;font-size:13px;color:var(--ink-mute);text-decoration:underline;}
+.rl-open[hidden]{display:none;}
 
 /* ============ 其它状态 ============ */
 .empty{

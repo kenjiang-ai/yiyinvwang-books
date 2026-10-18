@@ -409,25 +409,171 @@
   }
 
   /* ---------- 阅读器 ---------- */
+  var RL_BLOB = {};        // date -> blobURL（本会话内缓存，重开秒开）
+  var RL_BLOB_ORDER = [];
+  var RL_TOK = 0;
+  var RL_TEASERS = [
+    '你知道吗？天空看起来是蓝色的，是因为阳光被空气“散”开啦。',
+    '月亮本身不发光，我们看到的是它“借”来的太阳光。',
+    '蘑菇不是植物，它没有叶绿素，也不会开花结果。',
+    '我们的舌头大约有 1 万个味蕾，酸甜苦咸都靠它们。',
+    '蜗牛是世界上牙齿最多的动物之一，嘴里有上万颗小齿。',
+    '蜂蜜几乎不会变质，考古学家发现的古代蜂蜜还能吃。',
+    '海星没有大脑，但它有眼睛，还能把胃吐出来吃东西。',
+    '彩虹其实是一整个圆，我们站在地面上通常只看到一道弧。'
+  ];
+
+  function rlEl(id) { return document.getElementById(id); }
   function setReaderLoading(on) {
     if (el.readerLoading) el.readerLoading.hidden = !on;
+  }
+  function setRlProgress(pct) {
+    var fill = rlEl('rlBarFill'), pctEl = rlEl('rlPct');
+    if (pct == null) {
+      if (fill) fill.classList.add('indeterminate');
+      if (pctEl) pctEl.textContent = '';
+      return;
+    }
+    if (fill) { fill.classList.remove('indeterminate'); fill.style.width = Math.max(4, Math.min(100, pct)) + '%'; }
+    if (pctEl) pctEl.textContent = pct < 100 ? pct + '%' : '马上就好…';
+  }
+  function startTeaser(book) {
+    var q = rlEl('rlTeaser');
+    if (!q) return;
+    var pool = (book && book.tip ? [book.tip] : []).concat(RL_TEASERS);
+    var i = 0;
+    q.textContent = '💡 ' + pool[0];
+    clearInterval(q._t);
+    q._t = setInterval(function () {
+      i = (i + 1) % pool.length;
+      q.textContent = '💡 ' + pool[i];
+    }, 2800);
+  }
+  function stopTeaser() {
+    var q = rlEl('rlTeaser');
+    if (q && q._t) clearInterval(q._t);
+  }
+
+  function cacheBlob(book, blob) {
+    if (RL_BLOB[book.date]) URL.revokeObjectURL(RL_BLOB[book.date]);
+    RL_BLOB[book.date] = URL.createObjectURL(blob);
+    RL_BLOB_ORDER = RL_BLOB_ORDER.filter(function (d) { return d !== book.date; });
+    RL_BLOB_ORDER.push(book.date);
+    while (RL_BLOB_ORDER.length > 2) {
+      var d = RL_BLOB_ORDER.shift();
+      if (RL_BLOB[d]) { URL.revokeObjectURL(RL_BLOB[d]); delete RL_BLOB[d]; }
+    }
+  }
+
+  function fetchBookBlob(url, onProg) {
+    return new Promise(function (resolve, reject) {
+      if (!window.fetch || !window.URL || !window.Blob) return reject(new Error('no-fetch'));
+      fetch(url, { cache: 'force-cache' }).then(function (resp) {
+        if (!resp.ok) return reject(new Error('http ' + resp.status));
+        if (!resp.body || !resp.body.getReader) {
+          return resp.blob().then(function (b) { onProg(100); resolve(b); });
+        }
+        var reader = resp.body.getReader();
+        var total = +resp.headers.get('content-length') || 0;
+        var received = 0, chunks = [];
+        function pump() {
+          reader.read().then(function (r) {
+            if (r.done) {
+              onProg(100);
+              resolve(new Blob(chunks, { type: 'text/html' }));
+              return;
+            }
+            chunks.push(r.value);
+            received += r.value.length;
+            if (total) onProg(Math.min(99, Math.round(received / total * 100)));
+            else onProg(50);
+            pump();
+          }).catch(reject);
+        }
+        pump();
+      }).catch(reject);
+    });
+  }
+
+  // 轮询 iframe 文档 readyState，比单纯依赖 load 事件更稳（部分内置浏览器 load 不触发）
+  function armFrame(frame, tok, src) {
+    frame._armed = true;
+    frame.src = src;
+    var n = 0;
+    var t = setInterval(function () {
+      if (tok !== frame._tok) { clearInterval(t); return; }
+      n++;
+      var ready = false;
+      try { ready = frame.contentDocument && frame.contentDocument.readyState === 'complete'; } catch (e) { ready = false; }
+      if (ready) { clearInterval(t); setReaderLoading(false); stopTeaser(); }
+      else if (n > 200) { // 30s 仍未就绪，给兜底入口
+        clearInterval(t);
+        var open = rlEl('rlOpen');
+        if (open) { open.href = src; open.hidden = false; }
+      }
+    }, 150);
+  }
+
+  function showFallback(book) {
+    var retry = rlEl('rlRetry'), open = rlEl('rlOpen');
+    if (retry) {
+      retry.hidden = false;
+      retry.onclick = function () {
+        retry.hidden = true; if (open) open.hidden = true;
+        setReaderLoading(true); setRlProgress(null);
+        var frame = document.getElementById('readerFrame');
+        startLoad(book, frame, frame._tok);
+      };
+    }
+    if (open) { open.href = book.url; open.hidden = false; }
+  }
+
+  function startLoad(book, frame, tok) {
+    setRlProgress(RL_BLOB[book.date] ? 100 : (window.fetch ? null : 100));
+    var blobUrl = RL_BLOB[book.date];
+    if (blobUrl) {
+      armFrame(frame, tok, blobUrl);
+      return;
+    }
+    var done = false;
+    var slow = setTimeout(function () {
+      if (!done && tok === frame._tok) showFallback(book);
+    }, 20000);
+    fetchBookBlob(book.url, function (p) {
+      if (tok === frame._tok) setRlProgress(p);
+    }).then(function (blob) {
+      done = true; clearTimeout(slow);
+      if (tok !== frame._tok) return;
+      cacheBlob(book, blob);
+      armFrame(frame, tok, RL_BLOB[book.date]);
+    }).catch(function () {
+      done = true; clearTimeout(slow);
+      if (tok !== frame._tok) return;
+      // 不支持流式或下载失败：直接交给 iframe 加载（不确定进度），并给兜底
+      setRlProgress(null);
+      armFrame(frame, tok, book.url);
+      setTimeout(function () { if (tok === frame._tok) showFallback(book); }, 800);
+    });
   }
 
   function openReader(book) {
     var r = document.getElementById('reader');
     var frame = document.getElementById('readerFrame');
     document.getElementById('readerTitle').textContent = book.title;
-    // 先复位并显示不透明加载层，再切换 src：绘本多为 10MB 自包含 HTML，
-    // 切换到新内容前 iframe 会短暂停留在上一次文档（曾表现为“地心探险”那集闪现）
+    var tok = ++RL_TOK;
+    frame._tok = tok;
+    frame._armed = false;
     setReaderLoading(true);
-    frame._pendingUrl = book.url;
+    setRlProgress(null);
+    var retry = rlEl('rlRetry'), open = rlEl('rlOpen');
+    if (retry) retry.hidden = true;
+    if (open) open.hidden = true;
     frame.src = 'about:blank';
     r.hidden = false;
     document.body.classList.add('locked');
-    // 隔一个事件循环再载入新 URL，保证 about:blank 先提交、彻底清掉旧文档
+    startTeaser(book);
     setTimeout(function () {
-      // 若这期间用户已关闭，则不再载入
-      if (frame._pendingUrl === book.url && !r.hidden) frame.src = book.url;
+      if (tok === frame._tok && !r.hidden) startLoad(book, frame, tok);
     }, 40);
     r._book = book;
   }
@@ -435,21 +581,37 @@
   function closeReader() {
     var r = document.getElementById('reader');
     var frame = document.getElementById('readerFrame');
-    frame._pendingUrl = null;
+    frame._tok = 0;
+    frame._armed = false;
+    stopTeaser();
     setReaderLoading(false);
     r.hidden = true;
     frame.src = 'about:blank';
     document.body.classList.remove('locked');
   }
 
-  // 仅当 iframe 真正载入到“本期绘本”（而非 about:blank）时才隐藏加载层
+  // 背景预取最新一期（尊重省流量），点开时秒开
+  function prefetchLatest(books) {
+    if (!books || !books.length) return;
+    if (window.navigator && navigator.connection && navigator.connection.saveData) return;
+    if (!window.fetch || !window.URL) return;
+    var run = function () {
+      var b = books[0];
+      if (!b || !b.embed || RL_BLOB[b.date]) return;
+      fetchBookBlob(b.url, function () {}).then(function (blob) {
+        cacheBlob(b, blob);
+      }).catch(function () {});
+    };
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 3000 });
+    else setTimeout(run, 2500);
+  }
+
   function onReaderFrameLoad() {
     var frame = document.getElementById('readerFrame');
-    if (!frame._pendingUrl) return;
-    if (frame.src.indexOf('about:blank') === -1 && frame.src.indexOf(frame._pendingUrl) !== -1) {
-      frame._pendingUrl = null;
-      setReaderLoading(false);
-    }
+    if (!frame._armed) return;
+    var ready = false;
+    try { ready = frame.contentDocument && frame.contentDocument.readyState === 'complete'; } catch (e) { ready = false; }
+    if (ready && frame.src.indexOf('about:blank') === -1) { setReaderLoading(false); stopTeaser(); }
   }
 
   // embed 绘本在站内阅读器打开；外链在微信内则复制链接
@@ -624,6 +786,7 @@
         renderChips();
         render();
         el.footNote.textContent = '已更新 ' + state.books.length + ' 期 · ' + (state.cfg.subtitle || '');
+        prefetchLatest(state.books);
       })
       .catch(function (err) {
         el.main.innerHTML =
