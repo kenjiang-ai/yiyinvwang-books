@@ -5,12 +5,22 @@
   var STORE_KEY = 'pb_last_view';
   var WEEK = ['日', '一', '二', '三', '四', '五', '六'];
 
+  // 技能主题库的规范分类（顺序即分类导航呈现顺序）；导航只展示“书架里已有绘本”的分类
+  var CATEGORY_ORDER = [
+    '生命科学', '物质科学', '地球与宇宙', '天文航天', '地球与海洋',
+    '物理万象', '化学启蒙', '数学与思维', '技术工程', '技术与生活',
+    '人体与健康', 'AI与机器人', '安全与好习惯', '经济与生活', '人文与艺术',
+    '中国神话故事', '中国寓言故事', '中国成语故事', '外国神话故事', '外国寓言故事',
+    '财商教育', '马术知识', '吉他知识', '心理成长'
+  ];
+
   var state = {
     cfg: null,
     books: [],
     byDate: {},
     current: null,   // 当前展示的绘本日期
-    calCursor: null  // 日历当前显示的月份 {y, m} m:0-11
+    calCursor: null,  // 日历当前显示的月份 {y, m} m:0-11
+    filters: { q: '', cat: '', browse: false }
   };
 
   var el = {
@@ -19,6 +29,9 @@
     siteTitle: document.getElementById('siteTitle'),
     footNote: document.getElementById('footNote'),
     btnCalendar: document.getElementById('btnCalendar'),
+    searchInput: document.getElementById('searchInput'),
+    searchClear: document.getElementById('searchClear'),
+    catChips: document.getElementById('catChips'),
     sheet: document.getElementById('sheet'),
     calTitle: document.getElementById('calTitle'),
     calGrid: document.getElementById('calGrid'),
@@ -87,6 +100,7 @@
         title: b.title,
         author: b.author || '',
         ageRange: b.ageRange || '',
+        category: b.category || '',
         themes: Array.isArray(b.themes) ? b.themes : [],
         intro: b.intro || '',
         tip: b.tip || '',
@@ -122,8 +136,135 @@
     return null;
   }
 
+  /* ---------- 搜索与分类 ---------- */
+  function isBrowsing() {
+    var f = state.filters;
+    return f.browse || f.q.trim() !== '' || f.cat !== '';
+  }
+
+  // 书架里“实际出现过”的分类，按 CATEGORY_ORDER 排序；未在表中的新分类排到后面
+  function presentCategories() {
+    var map = {};
+    state.books.forEach(function (b) {
+      if (b.category) map[b.category] = (map[b.category] || 0) + 1;
+    });
+    var ordered = CATEGORY_ORDER.filter(function (c) { return map[c]; });
+    Object.keys(map).forEach(function (c) {
+      if (ordered.indexOf(c) < 0) ordered.push(c);
+    });
+    return ordered.map(function (c) { return { name: c, count: map[c] }; });
+  }
+
+  function bookHaystack(b) {
+    return [b.title, b.author, b.category, b.intro, b.tip, (b.themes || []).join(' ')]
+      .join(' ').toLowerCase();
+  }
+
+  function filteredBooks() {
+    var f = state.filters;
+    var terms = f.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return state.books.filter(function (b) {
+      if (f.cat && b.category !== f.cat) return false;
+      if (terms.length) {
+        var hay = bookHaystack(b);
+        for (var i = 0; i < terms.length; i++) {
+          if (hay.indexOf(terms[i]) === -1) return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  function renderChips() {
+    var cur = state.filters.cat;
+    var html = '<button type="button" class="cat-chip' + (cur === '' ? ' active' : '') +
+      '" data-cat="" role="tab" aria-selected="' + (cur === '' ? 'true' : 'false') + '">全部</button>';
+    presentCategories().forEach(function (c) {
+      var on = c.name === cur;
+      html += '<button type="button" class="cat-chip' + (on ? ' active' : '') +
+        '" data-cat="' + esc(c.name) + '" role="tab" aria-selected="' + (on ? 'true' : 'false') + '">' +
+        esc(c.name) + '<span class="cat-n">' + c.count + '</span></button>';
+    });
+    el.catChips.innerHTML = html;
+    Array.prototype.forEach.call(el.catChips.querySelectorAll('.cat-chip'), function (n) {
+      n.addEventListener('click', function () {
+        var c = n.getAttribute('data-cat');
+        state.filters.cat = c;
+        state.filters.browse = (c !== '') || state.filters.q.trim() !== '';
+        renderChips();
+        render();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      });
+    });
+  }
+
+  function resetFilters() {
+    state.filters = { q: '', cat: '', browse: false };
+    if (el.searchInput) el.searchInput.value = '';
+    if (el.searchClear) el.searchClear.hidden = true;
+    renderChips();
+  }
+
+  function exitBrowse() {
+    resetFilters();
+    state.current = resolveInitial();
+    if (history.replaceState) history.replaceState(null, '', '#d=' + state.current);
+    render();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function renderResults() {
+    var f = state.filters;
+    var q = f.q.trim();
+    var list = filteredBooks();
+    var label = f.cat ? ('分类 · ' + f.cat) : (q ? ('搜索 “' + q + '”') : '全部绘本');
+    var parts = [];
+
+    parts.push('<div class="result-head fade-in">');
+    parts.push('<h2>' + esc(label) + ' · ' + list.length + ' 本</h2>');
+    parts.push('<button id="resultClear" type="button" class="text-btn">' +
+      (f.cat || q ? '清除筛选' : '返回今日') + '</button>');
+    parts.push('</div>');
+
+    if (!list.length) {
+      parts.push(
+        '<div class="empty fade-in"><span class="glyph">🔍</span>',
+        '<h2>没有找到相关绘本</h2><p>换个词，或试试别的分类吧。</p></div>'
+      );
+    } else {
+      parts.push('<div class="grid fade-in">');
+      list.forEach(function (b) {
+        var thumb = b.cover
+          ? '<img src="' + esc(b.cover) + '" alt="' + esc(b.title) + '" loading="lazy" onerror="this.remove();this.parentNode.classList.add(' + "'img-fail'" + ')">'
+          : '<span class="grid-emoji">📖</span>';
+        parts.push(
+          '<button class="grid-card" type="button" data-date="' + esc(b.date) + '">',
+          '<span class="grid-cover">',
+          thumb,
+          b.category ? '<span class="grid-cat">' + esc(b.category) + '</span>' : '',
+          '</span>',
+          '<span class="grid-title">' + esc(b.title) + '</span>',
+          '<span class="grid-date">' + esc(fmtCN(b.date, true)) + ' · ' + esc(fmtWeek(b.date)) + '</span>',
+          '</button>'
+        );
+      });
+      parts.push('</div>');
+    }
+
+    el.main.innerHTML = parts.join('');
+    var clearBtn = document.getElementById('resultClear');
+    if (clearBtn) clearBtn.addEventListener('click', exitBrowse);
+    Array.prototype.forEach.call(document.querySelectorAll('.grid-card'), function (n) {
+      n.addEventListener('click', function () { go(n.getAttribute('data-date')); });
+    });
+  }
+
   /* ---------- 渲染：主视图 ---------- */
   function render() {
+    if (isBrowsing()) {
+      renderResults();
+      return;
+    }
     var key = state.current;
     var book = state.byDate[key];
     var t = todayKey();
@@ -178,6 +319,7 @@
     // 故事信息
     parts.push('<div class="book-body">');
     var chips = [];
+    if (book.category) chips.push('<span class="chip sage">' + esc(book.category) + '</span>');
     if (book.ageRange) chips.push('<span class="chip accent">' + esc(book.ageRange) + '</span>');
     book.themes.slice(0, 3).forEach(function (x) {
       chips.push('<span class="chip">' + esc(x) + '</span>');
@@ -210,7 +352,7 @@
     // 往期
     var past = state.books.filter(function (b) { return b.date !== key; }).slice(0, 5);
     if (past.length) {
-      parts.push('<div class="section-head"><h2>往期故事</h2><button type="button" id="allPast">全部 · 日历</button></div>');
+      parts.push('<div class="section-head"><h2>往期故事</h2><span class="head-actions"><button type="button" id="browseAll">全部绘本</button><button type="button" id="allPast">日历</button></span></div>');
       parts.push('<div class="past-list">');
       past.forEach(function (b) {
         parts.push(
@@ -249,6 +391,16 @@
 
     var all = document.getElementById('allPast');
     if (all) all.addEventListener('click', openCalendar);
+
+    var browse = document.getElementById('browseAll');
+    if (browse) browse.addEventListener('click', function () {
+      state.filters = { q: '', cat: '', browse: true };
+      el.searchInput.value = '';
+      el.searchClear.hidden = true;
+      renderChips();
+      render();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
 
     Array.prototype.forEach.call(document.querySelectorAll('.past-item'), function (n) {
       n.addEventListener('click', function () { go(n.getAttribute('data-date')); });
@@ -315,6 +467,7 @@
 
   function go(key) {
     if (!key) return;
+    if (isBrowsing()) resetFilters();
     state.current = key;
     // 切换用 replace，避免历史堆积
     if (history.replaceState) history.replaceState(null, '', '#d=' + key);
@@ -392,6 +545,23 @@
   function init() {
     document.getElementById('readerClose').addEventListener('click', closeReader);
     el.btnCalendar.addEventListener('click', openCalendar);
+
+    el.searchInput.addEventListener('input', function (e) {
+      var v = e.target.value || '';
+      state.filters.q = v;
+      el.searchClear.hidden = v.trim() === '';
+      state.filters.browse = true;
+      render();
+    });
+    el.searchClear.addEventListener('click', function () {
+      el.searchInput.value = '';
+      state.filters.q = '';
+      el.searchClear.hidden = true;
+      if (state.filters.cat === '') state.filters.browse = false;
+      render();
+      el.searchInput.focus();
+    });
+
     el.calPrev.addEventListener('click', function () {
       state.calCursor.m--; if (state.calCursor.m < 0) { state.calCursor.m = 11; state.calCursor.y--; }
       renderCalendar();
@@ -423,6 +593,7 @@
           document.title = state.cfg.title;
         }
         state.current = pickFromHash() || resolveInitial();
+        renderChips();
         render();
         el.footNote.textContent = '已更新 ' + state.books.length + ' 期 · ' + (state.cfg.subtitle || '');
       })

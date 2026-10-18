@@ -76,6 +76,98 @@ body.locked{overflow:hidden;}
 .fade-in{animation:fadeUp .42s cubic-bezier(.22,.7,.3,1) both;}
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 
+/* ============ 搜索与分类导航 ============ */
+.toolbar{padding:12px 0 6px;}
+.search{
+  display:flex;align-items:center;gap:9px;
+  background:var(--card);border:1px solid var(--line);
+  border-radius:15px;padding:0 12px;
+  box-shadow:0 1px 2px rgba(90,70,45,.05);
+}
+.search-ico{width:18px;height:18px;flex:0 0 18px;color:var(--ink-mute);}
+.search-input{
+  flex:1;min-width:0;border:none;outline:none;background:transparent;
+  font-family:var(--font);font-size:15px;color:var(--ink);
+  padding:12px 0;line-height:1.4;
+  -webkit-appearance:none;appearance:none;border-radius:0;
+}
+.search-input::placeholder{color:var(--ink-mute);}
+.search-input::-webkit-search-cancel-button{display:none;-webkit-appearance:none;}
+.search-clear{
+  flex:0 0 22px;width:22px;height:22px;border:none;border-radius:50%;
+  background:var(--ink-mute);color:#fff;display:grid;place-items:center;
+  cursor:pointer;padding:0;
+}
+.search-clear[hidden]{display:none;}
+.search-clear svg{width:12px;height:12px;}
+.cat-chips{
+  display:flex;flex-wrap:nowrap;gap:8px;overflow-x:auto;
+  padding:12px 2px 6px;margin:0 -20px;padding-left:20px;padding-right:20px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;
+}
+.cat-chips::-webkit-scrollbar{display:none;}
+.cat-chip{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+  border:1px solid var(--line);background:var(--card);color:var(--ink-soft);
+  font-family:var(--font);font-size:13px;line-height:1;
+  padding:8px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;
+  transition:transform .16s ease,background .16s ease,color .16s ease,box-shadow .16s ease;
+}
+.cat-chip:active{transform:scale(.95);}
+.cat-chip.active{
+  background:var(--accent);border-color:var(--accent);color:#fff;
+  box-shadow:0 6px 16px -8px rgba(201,113,77,.9);
+}
+.cat-n{
+  font-size:11px;line-height:1.4;opacity:.75;
+  background:rgba(148,120,90,.16);border-radius:999px;padding:1px 6px;
+}
+.cat-chip.active .cat-n{background:rgba(255,255,255,.24);opacity:1;}
+
+/* 结果区标题 */
+.result-head{
+  display:flex;align-items:baseline;justify-content:space-between;
+  margin:10px 0 14px;gap:12px;
+}
+.result-head h2{
+  font-family:var(--serif);font-size:17px;margin:0;letter-spacing:.03em;
+  min-width:0;word-break:break-word;
+}
+.result-head .text-btn{flex:0 0 auto;}
+
+/* 全部绘本网格 */
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.grid-card{
+  display:flex;flex-direction:column;text-align:left;
+  padding:0;border:1px solid var(--line);background:var(--card);
+  border-radius:16px;overflow:hidden;cursor:pointer;
+  font-family:var(--font);color:inherit;box-shadow:var(--shadow);
+  transition:transform .16s ease,border-color .16s ease;
+}
+.grid-card:active{transform:scale(.97);border-color:#DCCCB6;}
+.grid-cover{
+  position:relative;display:block;aspect-ratio:4/3;
+  background:linear-gradient(140deg,#EFE2CF,#E3D3BC);overflow:hidden;
+}
+.grid-cover img{width:100%;height:100%;object-fit:cover;display:block;}
+.grid-cover.img-fail{display:grid;place-items:center;}
+.grid-cover.img-fail::before{content:"📖";font-size:26px;}
+.grid-emoji{position:absolute;inset:0;display:grid;place-items:center;font-size:26px;color:#B09B7C;}
+.grid-cat{
+  position:absolute;left:8px;top:8px;max-width:78%;
+  background:rgba(255,253,248,.92);color:#5C7457;
+  font-size:10.5px;letter-spacing:.02em;padding:3px 8px;border-radius:999px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  backdrop-filter:blur(4px);
+}
+.grid-title{
+  font-size:14px;font-weight:600;line-height:1.4;
+  margin:9px 11px 3px;word-break:break-word;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.grid-date{font-size:11px;color:var(--ink-mute);margin:0 11px 11px;}
+.head-actions{display:flex;gap:18px;align-items:baseline;}
+
 /* 日期条 */
 .dateline{
   display:flex;align-items:center;gap:10px;
