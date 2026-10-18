@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link rel="apple-touch-icon" href="share.jpg">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="assets/app.css?v=3">
+<link rel="stylesheet" href="assets/app.css?v=4">
 </head>
 <body>
 <div id="app" class="app">
@@ -84,11 +84,18 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
     </button>
   </div>
-  <iframe id="readerFrame" class="reader-frame" title="绘本阅读" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"></iframe>
+  <div class="reader-body">
+    <iframe id="readerFrame" class="reader-frame" title="绘本阅读" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"></iframe>
+    <div id="readerLoading" class="reader-loading" hidden>
+      <span class="rl-spinner" aria-hidden="true"></span>
+      <p class="rl-title">绘本加载中…</p>
+      <p class="rl-sub">插图较多，第一次打开会稍慢一点</p>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="assets/app.js?v=4"></script>
+<script src="assets/app.js?v=5"></script>
 </body>
 </html>

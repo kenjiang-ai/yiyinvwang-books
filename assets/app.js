@@ -38,6 +38,7 @@
     calPrev: document.getElementById('calPrev'),
     calNext: document.getElementById('calNext'),
     calLatest: document.getElementById('calLatest'),
+    readerLoading: document.getElementById('readerLoading'),
     toast: document.getElementById('toast')
   };
 
@@ -408,22 +409,47 @@
   }
 
   /* ---------- 阅读器 ---------- */
+  function setReaderLoading(on) {
+    if (el.readerLoading) el.readerLoading.hidden = !on;
+  }
+
   function openReader(book) {
     var r = document.getElementById('reader');
     var frame = document.getElementById('readerFrame');
     document.getElementById('readerTitle').textContent = book.title;
-    frame.src = book.url;
+    // 先复位并显示不透明加载层，再切换 src：绘本多为 10MB 自包含 HTML，
+    // 切换到新内容前 iframe 会短暂停留在上一次文档（曾表现为“地心探险”那集闪现）
+    setReaderLoading(true);
+    frame._pendingUrl = book.url;
+    frame.src = 'about:blank';
     r.hidden = false;
     document.body.classList.add('locked');
+    // 隔一个事件循环再载入新 URL，保证 about:blank 先提交、彻底清掉旧文档
+    setTimeout(function () {
+      // 若这期间用户已关闭，则不再载入
+      if (frame._pendingUrl === book.url && !r.hidden) frame.src = book.url;
+    }, 40);
     r._book = book;
   }
 
   function closeReader() {
     var r = document.getElementById('reader');
     var frame = document.getElementById('readerFrame');
+    frame._pendingUrl = null;
+    setReaderLoading(false);
     r.hidden = true;
     frame.src = 'about:blank';
     document.body.classList.remove('locked');
+  }
+
+  // 仅当 iframe 真正载入到“本期绘本”（而非 about:blank）时才隐藏加载层
+  function onReaderFrameLoad() {
+    var frame = document.getElementById('readerFrame');
+    if (!frame._pendingUrl) return;
+    if (frame.src.indexOf('about:blank') === -1 && frame.src.indexOf(frame._pendingUrl) !== -1) {
+      frame._pendingUrl = null;
+      setReaderLoading(false);
+    }
   }
 
   // embed 绘本在站内阅读器打开；外链在微信内则复制链接
@@ -544,6 +570,7 @@
   /* ---------- 初始化 ---------- */
   function init() {
     document.getElementById('readerClose').addEventListener('click', closeReader);
+    document.getElementById('readerFrame').addEventListener('load', onReaderFrameLoad);
     el.btnCalendar.addEventListener('click', openCalendar);
 
     el.searchInput.addEventListener('input', function (e) {
