@@ -569,6 +569,7 @@
 
   /* ---------- 初始化 ---------- */
   function init() {
+    document.getElementById('readerBack').addEventListener('click', closeReader);
     document.getElementById('readerClose').addEventListener('click', closeReader);
     document.getElementById('readerFrame').addEventListener('load', onReaderFrameLoad);
     el.btnCalendar.addEventListener('click', openCalendar);

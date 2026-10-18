@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <link rel="apple-touch-icon" href="share.jpg">
 <link rel="icon" type="image/svg+xml" href="favicon.svg">
-<link rel="stylesheet" href="assets/app.css?v=4">
+<link rel="stylesheet" href="assets/app.css?v=5">
 </head>
 <body>
 <div id="app" class="app">
@@ -79,6 +79,10 @@
 
 <div id="reader" class="reader" hidden>
   <div class="reader-bar">
+    <button id="readerBack" class="reader-back" type="button" aria-label="返回书架">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      <span>返回</span>
+    </button>
     <span id="readerTitle" class="reader-title">绘本</span>
     <button id="readerClose" class="icon-btn reader-close" type="button" aria-label="关闭阅读">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
@@ -96,6 +100,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="assets/app.js?v=5"></script>
+<script src="assets/app.js?v=6"></script>
 </body>
 </html>
