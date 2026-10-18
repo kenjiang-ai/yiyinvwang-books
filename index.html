@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="format-detection" content="telephone=no">
+<title>一一女王绘本故事分享</title>
+<meta name="description" content="每天一本会动的绘本，陪孩子慢慢长大">
+<meta name="theme-color" content="#FBF6EE">
+<meta property="og:title" content="一一女王绘本故事分享">
+<meta property="og:description" content="每天一本互动绘本，点开就能读，陪孩子慢慢长大">
+<meta property="og:image" content="https://a9f3c47f8a613f559.app.workbuddy.host/share.jpg">
+<meta property="og:type" content="website">
+<link rel="apple-touch-icon" href="share.jpg">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="assets/app.css?v=2">
+</head>
+<body>
+<div id="app" class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 6.5C10.4 5.2 8.3 4.7 5.5 4.7 4.7 4.7 4 5.4 4 6.2v11.1c0 .8.7 1.5 1.5 1.5 2.8 0 4.9.5 6.5 1.7 1.6-1.2 3.7-1.7 6.5-1.7.8 0 1.5-.7 1.5-1.5V6.2c0-.8-.7-1.5-1.5-1.5-2.8 0-4.9.5-6.5 1.8z"/>
+          <path d="M12 6.5v14"/>
+        </svg>
+      </span>
+      <span class="brand-text">
+        <strong id="siteTitle">一一女王绘本故事分享</strong>
+        <small>每天一本 · 亲子共读</small>
+      </span>
+    </div>
+    <button id="btnCalendar" class="icon-btn" type="button" aria-label="打开阅读日历">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3.5" y="5.5" width="17" height="15" rx="2.5"/>
+        <path d="M8 3.5v4M16 3.5v4M3.5 10.5h17"/>
+      </svg>
+    </button>
+  </header>
+
+  <main id="main" class="main"></main>
+
+  <footer class="foot">
+    <span id="footNote">正在加载…</span>
+  </footer>
+</div>
+
+<div id="sheet" class="sheet" hidden>
+  <div class="sheet-backdrop" data-close="1"></div>
+  <section class="sheet-panel" role="dialog" aria-modal="true" aria-label="阅读日历">
+    <div class="sheet-handle" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <button id="calPrev" class="cal-nav" type="button" aria-label="上个月">‹</button>
+      <h2 id="calTitle">2026 年 10 月</h2>
+      <button id="calNext" class="cal-nav" type="button" aria-label="下个月">›</button>
+    </div>
+    <div class="cal-weekdays" aria-hidden="true">
+      <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+    </div>
+    <div id="calGrid" class="cal-grid"></div>
+    <div class="sheet-foot">
+      <span><i class="dot dot-on"></i>有绘本</span>
+      <span><i class="dot dot-today"></i>今天</span>
+      <button id="calLatest" class="text-btn" type="button">回到今天</button>
+    </div>
+  </section>
+</div>
+
+<div id="reader" class="reader" hidden>
+  <div class="reader-bar">
+    <span id="readerTitle" class="reader-title">绘本</span>
+    <button id="readerClose" class="icon-btn reader-close" type="button" aria-label="关闭阅读">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
+  </div>
+  <iframe id="readerFrame" class="reader-frame" title="绘本阅读" allow="autoplay" sandbox="allow-scripts allow-same-origin allow-downloads allow-popups"></iframe>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="assets/app.js?v=3"></script>
+</body>
+</html>
