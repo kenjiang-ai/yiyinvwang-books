@@ -333,7 +333,7 @@
 
     if (book.tip) {
       parts.push(
-        '<div class="book-tip"><span class="k">共读小问</span><span>' + esc(book.tip) + '</span></div>'
+        '<div class="book-tip"><span class="k">想一想</span><span>' + esc(book.tip) + '</span></div>'
       );
     }
 
