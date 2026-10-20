@@ -504,13 +504,15 @@
   }
 
   // 判断 iframe 里是否真的加载出了绘本正文。
-  // 注意：about:blank 或加载失败的白屏，readyState 也可能是 'complete'，
-  // 不能只看 readyState，必须确认正文节点（开始按钮/封面视图/足够内容）已存在。
+  // 注意：about:blank 或加载失败的白屏，readyState 也可能是 'complete'；
+  // 而且静态 HTML 里 #btn-start 元素在 JS 运行前就已存在（占位文案），
+  // 所以不能只看 readyState 或 #btn-start，必须确认封面图已由 renderCover 注入真实 data URI。
   function frameHasContent(frame) {
     try {
       var d = frame.contentDocument;
       if (!d) return false;
-      if (d.getElementById('btn-start') || d.getElementById('view-cover')) return true;
+      var ci = d.getElementById('cover-img');
+      if (ci && (ci.src || '').indexOf('data:') === 0) return true;
       if (d.readyState === 'complete' && d.body &&
           (d.body.innerHTML || '').length > 3000) return true;
       return false;
