@@ -409,8 +409,6 @@
   }
 
   /* ---------- 阅读器 ---------- */
-  var RL_BLOB = {};        // date -> blobURL（本会话内缓存，重开秒开）
-  var RL_BLOB_ORDER = [];
   var RL_TOK = 0;
   var RL_TEASERS = [
     '你知道吗？天空看起来是蓝色的，是因为阳光被空气“散”开啦。',
@@ -454,62 +452,68 @@
     if (q && q._t) clearInterval(q._t);
   }
 
-  function cacheBlob(book, blob) {
-    if (RL_BLOB[book.date]) URL.revokeObjectURL(RL_BLOB[book.date]);
-    RL_BLOB[book.date] = URL.createObjectURL(blob);
-    RL_BLOB_ORDER = RL_BLOB_ORDER.filter(function (d) { return d !== book.date; });
-    RL_BLOB_ORDER.push(book.date);
-    while (RL_BLOB_ORDER.length > 2) {
-      var d = RL_BLOB_ORDER.shift();
-      if (RL_BLOB[d]) { URL.revokeObjectURL(RL_BLOB[d]); delete RL_BLOB[d]; }
-    }
-  }
-
-  function fetchBookBlob(url, onProg) {
+  // 边下边显示进度，并把文件预热进 HTTP 缓存（读完即丢弃 Blob，不创建 blob:URL）。
+  // 关键：最终 iframe 一律用“同源真实 URL”，绝不把 blob:URL 塞进 iframe——
+  // iOS WKWebView 及部分内置浏览器不支持在 iframe 里加载 blob:，会白屏“点不开”。
+  function warmCache(url, onProg) {
     return new Promise(function (resolve, reject) {
-      if (!window.fetch || !window.URL || !window.Blob) return reject(new Error('no-fetch'));
+      if (!window.fetch) return reject(new Error('no-fetch'));
       fetch(url, { cache: 'force-cache' }).then(function (resp) {
         if (!resp.ok) return reject(new Error('http ' + resp.status));
         if (!resp.body || !resp.body.getReader) {
-          return resp.blob().then(function (b) { onProg(100); resolve(b); });
+          return resp.blob().then(function () { onProg(100); resolve(true); });
         }
         var reader = resp.body.getReader();
         var total = +resp.headers.get('content-length') || 0;
-        var received = 0, chunks = [];
-        function pump() {
+        var received = 0;
+        (function pump() {
           reader.read().then(function (r) {
-            if (r.done) {
-              onProg(100);
-              resolve(new Blob(chunks, { type: 'text/html' }));
-              return;
-            }
-            chunks.push(r.value);
+            if (r.done) { onProg(100); resolve(true); return; }
             received += r.value.length;
             if (total) onProg(Math.min(99, Math.round(received / total * 100)));
             else onProg(50);
             pump();
           }).catch(reject);
-        }
-        pump();
+        })();
       }).catch(reject);
     });
   }
 
-  // 轮询 iframe 文档 readyState，比单纯依赖 load 事件更稳（部分内置浏览器 load 不触发）
-  function armFrame(frame, tok, src) {
+  // 判断 iframe 里是否真的加载出了绘本正文。
+  // 注意：about:blank 或加载失败的白屏，readyState 也可能是 'complete'，
+  // 不能只看 readyState，必须确认正文节点（开始按钮/封面视图/足够内容）已存在。
+  function frameHasContent(frame) {
+    try {
+      var d = frame.contentDocument;
+      if (!d) return false;
+      if (d.getElementById('btn-start') || d.getElementById('view-cover')) return true;
+      if (d.readyState === 'complete' && d.body &&
+          (d.body.innerHTML || '').length > 3000) return true;
+      return false;
+    } catch (e) { return false; }
+  }
+
+  // 轮询 iframe 直到“真正出现绘本内容”，再隐藏加载层；比单纯依赖 load/readyState 更稳。
+  function armFrame(frame, tok, realUrl) {
     frame._armed = true;
-    frame.src = src;
+    frame._realUrl = realUrl;
+    frame.src = realUrl;                 // 同源真实 URL，iOS Safari/WKWebView/内置浏览器都能加载
     var n = 0;
     var t = setInterval(function () {
       if (tok !== frame._tok) { clearInterval(t); return; }
       n++;
-      var ready = false;
-      try { ready = frame.contentDocument && frame.contentDocument.readyState === 'complete'; } catch (e) { ready = false; }
-      if (ready) { clearInterval(t); setReaderLoading(false); stopTeaser(); }
-      else if (n > 200) { // 30s 仍未就绪，给兜底入口
+      if (frameHasContent(frame)) {
+        clearInterval(t);
+        setReaderLoading(false);
+        stopTeaser();
+        return;
+      }
+      if (n > 200) { // 30s 仍未出正文：给重试与“新页面打开”兜底入口
         clearInterval(t);
         var open = rlEl('rlOpen');
-        if (open) { open.href = src; open.hidden = false; }
+        if (open) { open.href = realUrl; open.hidden = false; }
+        var retry = rlEl('rlRetry');
+        if (retry) retry.hidden = false;
       }
     }, 150);
   }
@@ -529,27 +533,22 @@
   }
 
   function startLoad(book, frame, tok) {
-    setRlProgress(RL_BLOB[book.date] ? 100 : (window.fetch ? null : 100));
-    var blobUrl = RL_BLOB[book.date];
-    if (blobUrl) {
-      armFrame(frame, tok, blobUrl);
-      return;
-    }
+    setRlProgress(window.fetch ? null : 100);
     var done = false;
     var slow = setTimeout(function () {
       if (!done && tok === frame._tok) showFallback(book);
     }, 20000);
-    fetchBookBlob(book.url, function (p) {
+    // 边下边显进度、预热缓存；完成后 iframe 用同源真实 URL（已在缓存中，秒开）。
+    warmCache(book.url, function (p) {
       if (tok === frame._tok) setRlProgress(p);
-    }).then(function (blob) {
+    }).then(function () {
       done = true; clearTimeout(slow);
       if (tok !== frame._tok) return;
-      cacheBlob(book, blob);
-      armFrame(frame, tok, RL_BLOB[book.date]);
+      armFrame(frame, tok, book.url);
     }).catch(function () {
       done = true; clearTimeout(slow);
       if (tok !== frame._tok) return;
-      // 不支持流式或下载失败：直接交给 iframe 加载（不确定进度），并给兜底
+      // 不支持流式或下载失败：仍然直接交给 iframe 加载真实 URL（并给兜底）
       setRlProgress(null);
       armFrame(frame, tok, book.url);
       setTimeout(function () { if (tok === frame._tok) showFallback(book); }, 800);
@@ -590,17 +589,16 @@
     document.body.classList.remove('locked');
   }
 
-  // 背景预取最新一期（尊重省流量），点开时秒开
+  // 背景预热最新一期（尊重省流量）：只把文件拉进 HTTP 缓存，点开时 iframe 秒开，
+  // 不再创建 blob:URL（blob: 进 iframe 在 iOS 上不兼容）。
   function prefetchLatest(books) {
     if (!books || !books.length) return;
     if (window.navigator && navigator.connection && navigator.connection.saveData) return;
-    if (!window.fetch || !window.URL) return;
+    if (!window.fetch) return;
     var run = function () {
       var b = books[0];
-      if (!b || !b.embed || RL_BLOB[b.date]) return;
-      fetchBookBlob(b.url, function () {}).then(function (blob) {
-        cacheBlob(b, blob);
-      }).catch(function () {});
+      if (!b || !b.embed) return;
+      warmCache(b.url, function () {}).catch(function () {});
     };
     if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 3000 });
     else setTimeout(run, 2500);
@@ -609,9 +607,7 @@
   function onReaderFrameLoad() {
     var frame = document.getElementById('readerFrame');
     if (!frame._armed) return;
-    var ready = false;
-    try { ready = frame.contentDocument && frame.contentDocument.readyState === 'complete'; } catch (e) { ready = false; }
-    if (ready && frame.src.indexOf('about:blank') === -1) { setReaderLoading(false); stopTeaser(); }
+    if (frameHasContent(frame)) { setReaderLoading(false); stopTeaser(); }
   }
 
   // embed 绘本在站内阅读器打开；外链在微信内则复制链接
