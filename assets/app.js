@@ -452,6 +452,10 @@
     if (q && q._t) clearInterval(q._t);
   }
 
+  // 浏览器 fetch 流拿到的是“解压后”字节，而 content-length 是“压缩后”字节；
+  // 这类内嵌 base64 的 HTML 经 gzip 后约膨胀 1.34 倍（经验值），用于估算进度。
+  var GZIP_EXPAND = 1.34;
+
   // 边下边显示进度，并把文件预热进 HTTP 缓存（读完即丢弃 Blob，不创建 blob:URL）。
   // 关键：最终 iframe 一律用“同源真实 URL”，绝不把 blob:URL 塞进 iframe——
   // iOS WKWebView 及部分内置浏览器不支持在 iframe 里加载 blob:，会白屏“点不开”。
@@ -464,7 +468,8 @@
           return resp.blob().then(function () { onProg(100); resolve(true); });
         }
         var reader = resp.body.getReader();
-        var total = +resp.headers.get('content-length') || 0;
+        var enc = resp.headers.get('content-encoding');
+        var total = (+resp.headers.get('content-length') || 0) * (enc ? GZIP_EXPAND : 1);
         var received = 0;
         (function pump() {
           reader.read().then(function (r) {
@@ -477,6 +482,25 @@
         })();
       }).catch(reject);
     });
+  }
+
+  // 同一 URL 的“进行中下载”只保留一份：背景预取与点击打开共用同一个下载，
+  // 避免两个 11MB 并发抢带宽、互相拖慢；进度可被多个订阅者接收。
+  var RL_LOADS = {};
+  function getLoader(url) {
+    if (RL_LOADS[url]) return RL_LOADS[url];
+    var listeners = [];
+    function emit(p) {
+      listeners.forEach(function (l) { try { l(p); } catch (e) {} });
+    }
+    var promise = warmCache(url, emit).then(
+      function (r) { delete RL_LOADS[url]; return r; },
+      function (e) { delete RL_LOADS[url]; throw e; }
+    );
+    return RL_LOADS[url] = {
+      subscribe: function (l) { listeners.push(l); },
+      promise: promise
+    };
   }
 
   // 判断 iframe 里是否真的加载出了绘本正文。
@@ -538,10 +562,13 @@
     var slow = setTimeout(function () {
       if (!done && tok === frame._tok) showFallback(book);
     }, 20000);
-    // 边下边显进度、预热缓存；完成后 iframe 用同源真实 URL（已在缓存中，秒开）。
-    warmCache(book.url, function (p) {
+    // 与背景预取共用同一份下载（不重复拉），边下边显进度；
+    // 完成后 iframe 用同源真实 URL（已在缓存中，秒开）。
+    var loader = getLoader(book.url);
+    loader.subscribe(function (p) {
       if (tok === frame._tok) setRlProgress(p);
-    }).then(function () {
+    });
+    loader.promise.then(function () {
       done = true; clearTimeout(slow);
       if (tok !== frame._tok) return;
       armFrame(frame, tok, book.url);
@@ -590,7 +617,7 @@
   }
 
   // 背景预热最新一期（尊重省流量）：只把文件拉进 HTTP 缓存，点开时 iframe 秒开，
-  // 不再创建 blob:URL（blob: 进 iframe 在 iOS 上不兼容）。
+  // 不创建 blob:URL（blob: 进 iframe 在 iOS 上不兼容）；点击时复用同一份下载。
   function prefetchLatest(books) {
     if (!books || !books.length) return;
     if (window.navigator && navigator.connection && navigator.connection.saveData) return;
@@ -598,7 +625,7 @@
     var run = function () {
       var b = books[0];
       if (!b || !b.embed) return;
-      warmCache(b.url, function () {}).catch(function () {});
+      getLoader(b.url).promise.catch(function () {});
     };
     if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 3000 });
     else setTimeout(run, 2500);
