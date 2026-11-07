@@ -448,6 +448,27 @@ body.locked{overflow:hidden;}
 }
 .wx-hint svg{width:15px;height:15px;flex:0 0 15px;}
 
+/* ============ 宽屏 / 横版适配（手机横屏、平板、桌面） ============ */
+/* 手机横屏、小平板：容器加宽，卡片网格 3 列，分类条不再横向出血 */
+@media (min-width:720px){
+  .app{max-width:920px;padding-left:28px;padding-right:28px;}
+  .topbar{padding-top:22px;}
+  .grid{grid-template-columns:repeat(3,1fr);gap:16px;}
+  .cat-chips{margin:0;padding:12px 0 6px;flex-wrap:wrap;overflow:visible;}
+}
+/* 桌面、大平板：卡片网格 4 列；今日绘本改为封面左、信息右两栏 */
+@media (min-width:1080px){
+  .app{max-width:1180px;}
+  .grid{grid-template-columns:repeat(4,1fr);gap:18px;}
+  .book{display:flex;flex-direction:row;align-items:stretch;}
+  .book .cover{flex:0 0 44%;aspect-ratio:auto;}
+  .book .cover img{height:100%;}
+  .book-body{flex:1 1 auto;padding:34px 40px 36px;display:flex;flex-direction:column;}
+  .book-title{font-size:30px;}
+  .book .cta{margin-top:auto;}
+  .past-list{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+}
+
 @media (max-width:360px){
   .app{padding-left:16px;padding-right:16px;}
   .book-title{font-size:23px;}
